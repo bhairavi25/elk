@@ -15,7 +15,7 @@ RUN tar zxvf /tmp/logstash.tar.gz -C /opt && mv /opt/logstash-1.4.2 /opt/logstas
 RUN mkdir /opt/logs
 
 #ADD collectd-types.db /opt/collectd-types.db
-ADD logstash-mix.conf /opt/logstash/logstash.conf
+ADD logstash.conf /opt/logstash/logstash.conf
 ADD catalina.out /tmp/catalina.out
 ADD ibm-mms-amp.debug.log /tmp/ibm-mms-amp.debug.log
 
