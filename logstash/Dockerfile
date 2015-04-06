@@ -15,17 +15,20 @@ RUN tar zxvf /tmp/logstash.tar.gz -C /opt && mv /opt/logstash-1.4.2 /opt/logstas
 RUN mkdir /opt/logs
 
 #ADD collectd-types.db /opt/collectd-types.db
-ADD logstash.conf /opt/logstash/logstash.conf
+ADD logstash.conf.tmpl /opt/logstash/logstash.conf.tmpl
 ADD catalina.out /tmp/catalina.out
 ADD ibm-mms-amp.debug.log /tmp/ibm-mms-amp.debug.log
 
 VOLUME ["/opt/conf", "/opt/certs", "/opt/logs"]
 
-EXPOSE 9300
-#EXPOSE 9200
 
 #CMD /usr/local/bin/start_logstash.sh
 #CMD /opt/logstash/bin/logstash -e 'input { stdin { } } output { stdout { codec => rubydebug } }'
-CMD /opt/logstash/bin/logstash -f /opt/logstash/logstash.conf
 
+ADD logstash-wrapper.sh /usr/local/bin/logstash-wrapper.sh
 
+CMD /usr/local/bin/logstash-wrapper.sh
+
+# docker build bug where cache fails because of expose directive
+#EXPOSE 9200
+EXPOSE 9300
