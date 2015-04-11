@@ -16,10 +16,10 @@ RUN mkdir /opt/logs
 
 #ADD collectd-types.db /opt/collectd-types.db
 ADD logstash.conf.tmpl /opt/logstash/logstash.conf.tmpl
-ADD catalina.out /tmp/catalina.out
-ADD ibm-mms-amp.debug.log /tmp/ibm-mms-amp.debug.log
+#ADD catalina.out /tmp/catalina.out
+#ADD ibm-mms-amp.debug.log /tmp/ibm-mms-amp.debug.log
 
-VOLUME ["/opt/conf", "/opt/certs", "/opt/logs"]
+VOLUME ["/opt/certs", "/opt/logs"]
 
 
 #CMD /usr/local/bin/start_logstash.sh
