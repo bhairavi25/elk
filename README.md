@@ -28,3 +28,7 @@ launch logstash:
 ```
 docker run -d --volumes-from /logdata --name <logstash-container-name> --link <elastic-container-name>:<elastic-alias> <image id/name>
 ```
+
+```
+curl 'http://es:9200/_search?pretty'
+```
