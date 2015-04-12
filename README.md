@@ -30,5 +30,20 @@ docker run -d --volumes-from /logdata --name <logstash-container-name> --link <e
 ```
 
 ```
+docker run -d --volumes-from /logdata -v /etc/pki:/etc/pki --name logstash --hostname logstash.example.com --link elastic:es <image id/name>
+```
+
+
+```
 curl 'http://es:9200/_search?pretty'
+```
+
+logstash-forwarder
+```
+openssl req -x509 -batch -nodes -newkey rsa:2048 -keyout logstash-forwarder.key -out logstash-forwarder.crt -days 365 -subj /CN=logstash.example.com
+```
+
+launch logstash-forwarder
+```
+ docker run -i -d -h testserver --volumes-from /logdata -v /etc/config:/etc/config -v /etc/pki:/etc/pki --name logstash-forwarder --link logstash:logstash.example.com logstash-forwarder-elk
 ```
