@@ -1,6 +1,6 @@
 {
   "network": {
-    "servers": [ "logstash.example.com:5000" ],
+    "servers": [ "logstash.mms.ibmcloud.com:5000" ],
     "ssl certificate": "/etc/pki/tls/certs/logstash-forwarder/logstash-forwarder.crt",
     "ssl key": "/etc/pki/tls/private/logstash-forwarder/logstash-forwarder.key",
     "ssl ca": "/etc/pki/tls/certs/logstash-forwarder/logstash-forwarder.crt",
