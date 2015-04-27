@@ -34,12 +34,14 @@ EXPOSE 9200
 
 #RUN cp nginx.conf /etc/nginx/sites-available/default
 
+WORKDIR kibana-4.0.0-beta3
+
+RUN sed -i 's|elasticsearch: "http://localhost:9200"|elasticsearch: "http://es:9200"|g' config/kibana.yml
+
 #CMD service nginx restart
 #CMD service nginx start
 
 #ADD run-nginx.sh /opt/run-nginx.sh
 #RUN chmod 777 /opt/run-nginx.sh
-
-WORKDIR kibana-4.0.0-beta3
 
 CMD bin/kibana
