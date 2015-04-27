@@ -65,3 +65,8 @@ Kibana:
 ```
 docker run -d --name kibana --link elastic:es -p 5601:5601 localhost.localdomain:5000/kibana4-elk
 ```
+
+Launch logstash-forwarder
+```
+/opt/logstash-forwarder/bin/logstash-forwarder -config /etc/config.json
+```
