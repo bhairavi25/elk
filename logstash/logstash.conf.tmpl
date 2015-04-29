@@ -5,10 +5,6 @@ input {
     ssl_key => "/etc/pki/tls/private/logstash-forwarder/logstash-forwarder.key"
     type => "lumberjack"
   }
-  file {
-    path => "/var/log/catalina.out"
-    start_position => beginning
-  }
 }
 
 filter {
