@@ -8,8 +8,7 @@ cd elasticsearch
 docker build -t elk-elasticsearch .
 ```
 
-Create a data-only container for storing logs
-```
+
 docker run -d -v /var/log:/logdata --name logdata f913a9f89714 echo Data-only container for logs
 ```
 
