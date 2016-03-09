@@ -14,8 +14,8 @@ parameters:
     default: "m1.medium"
   image:
     type: string
-    description: ubuntu
-    default: "c85c07f4-60ad-439b-a398-e87db65644de"
+    description: rhel
+    default: "f700ef81-e0c3-4d97-a2d9-336ac0b12d25"
   network_id_External_Network:
     type: string
     description: Network
