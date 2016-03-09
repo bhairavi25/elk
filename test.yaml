@@ -1,0 +1,42 @@
+heat_template_version: 2013-05-23
+
+description: >
+  A demo template to show provisioning of a single Linux instances.
+
+parameters:
+  Server_name:
+    type: string
+    description: sample-heat-test
+    default: test-provision
+  flavor:
+    type: string
+    description: medium flavor
+    default: "m1.medium"
+  image:
+    type: string
+    description: ubuntu
+    default: "c85c07f4-60ad-439b-a398-e87db65644de"
+  network_id_External_Network:
+    type: string
+    description: Network
+    default: "050aedc2-dc2b-4da9-b074-b1b616147f05"
+  availablity_zone:
+    type: string
+    description: Availability Zone
+    default: "nova"
+
+resources:
+
+  windows_ico_15Jan2015:
+    type: OS::Nova::Server
+    properties:
+      networks:
+          - port: { get_resource: network_port }
+      name: { get_param: Server_name }  # Server name
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+
+  network_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_External_Network }
