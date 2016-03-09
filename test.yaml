@@ -41,7 +41,7 @@ resources:
       name: { get_param: Server_name }  # Server name
       image: { get_param: image }
       flavor: { get_param: flavor }
-      availability_zone: { get_param: availability_zone }
+      availability_zone: { get_param: availablity_zone }
       #key_name: { get_param: key_name }
 
   network_port:
