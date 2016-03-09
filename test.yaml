@@ -20,10 +20,10 @@ parameters:
     type: string
     description: Network
     default: "050aedc2-dc2b-4da9-b074-b1b616147f05"
-  availablity_zone:
-    type: string
-    description: Availability Zone
-    default: "nova"
+  #availablity_zone:
+    #type: string
+    #description: Availability Zone
+    #default: "nova"
   #key_name:
     #type: string
     #description: 'For most clouds, the name of the key-pair to be used for the compute instance; for VMware clouds, the contents of the public SSH key for the compute instance'
@@ -41,7 +41,6 @@ resources:
       name: { get_param: Server_name }  # Server name
       image: { get_param: image }
       flavor: { get_param: flavor }
-      #availability_zone: { get_param: availablity_zone }
       #key_name: { get_param: key_name }
 
   network_port:
