@@ -7,7 +7,7 @@ parameters:
   Server_name:
     type: string
     description: sample-heat-test
-    default: test-provision1
+    default: test-provision3
   flavor:
     type: string
     description: medium flavor
