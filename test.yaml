@@ -24,12 +24,12 @@ parameters:
     #type: string
     #description: Availability Zone
     #default: "nova"
-  #key_name:
-    #type: string
-    #description: 'For most clouds, the name of the key-pair to be used for the compute instance; for VMware clouds, the contents of the public SSH key for the compute instance'
-    #label: SSH Key name
-    #constraints:
-    #- custom_constraint: nova.keypair  
+  key_name:
+    type: string
+    description: 'For most clouds, the name of the key-pair to be used for the compute instance; for VMware clouds, the contents of the public SSH key for the compute instance'
+    label: SSH Key name
+    constraints:
+     - custom_constraint: nova.keypair  
 
 resources:
 
@@ -41,7 +41,7 @@ resources:
       name: { get_param: Server_name }  # Server name
       image: { get_param: image }
       flavor: { get_param: flavor }
-      #key_name: { get_param: key_name }
+      key_name: { get_param: key_name }
 
   network_port:
     type: OS::Neutron::Port
