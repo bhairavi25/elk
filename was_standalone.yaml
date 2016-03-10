@@ -473,7 +473,7 @@ resources:
       networks:
           - port: { get_resource: server_pgPrivate-10-2-1-0-m24_port_one }
       name: { get_param: minion_one_name }
-      image: {get_param: image }
+      image: {get_param: image_id }
       flavor: { get_param: flavor }
       key_name: { get_param: Key_name }
       config_drive: "True"
