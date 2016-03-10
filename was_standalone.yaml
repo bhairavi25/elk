@@ -27,10 +27,12 @@ parameters:
     type: string
     description: Generated to reference 'network_id_server' network.
     default: "050aedc2-dc2b-4da9-b074-b1b616147f05"
-  image:
+  image_id:
     type: string
     description: OS Image to deploy onto
-    default: c85c07f4-60ad-439b-a398-e87db65644de  # Ubuntu_14.04_LTS_Server4
+    label: OS Image
+    constraints:
+    - custom_constraint: glance.image
   Key_name:
     type: string
     description: Key Name
