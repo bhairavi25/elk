@@ -1,0 +1,491 @@
+heat_template_version: 2013-05-23
+
+description: >
+  A document-based template to configure your Software Defined Environment.
+
+parameters:
+  salt_api_user:
+    type: string
+    description: The user connecting to Salt API
+    label: Salt api user
+    default: ''
+  salt_api_pass:
+    type: string
+    description: Password for connecting to Salt API
+    label: Salt api password
+    hidden: True
+    default: ''
+  yum_repo_url:
+    type: string
+    description: The server hosting the YUM repository
+    default: ""
+  flavor:
+    type: string
+    description: Flavor to be used for compute instance
+    label: Flavor
+    constraints:
+    - custom_constraint: nova.flavor
+  network_id_server:
+    type: string
+    description: Private Network
+    label: Private network
+    constraints:
+    - custom_constraint: neutron.network
+  image_id:
+    type: string
+    description: OS Image to deploy onto
+    label: OS Image
+    constraints:
+    - custom_constraint: glance.image
+  Key_name:
+    type: string
+    description: Key Name
+    constraints:
+     - custom_constraint: nova.keypair
+  environment:
+    type: string
+    description: The environment the nodes are part of
+    default: test
+
+  salt_orchestration:
+    type: string
+    description: Minion orchestration script
+    default: ibm_was_v855_linux_standalone_orchestration
+
+  workload_automation:
+    type: string
+    description: The workload automation to install
+    default: ibm_was
+
+  minion_one_name:
+    type: string
+    description: Minion name
+    default: ibm_was_v855_01
+
+  minion_one_role:
+    type: string
+    description: Minion SaltStack Formula
+    default: ibm_im_v1x_linux
+
+  minion_two_role:
+    type: string
+    description: Minion SaltStack Formula
+    default: ibm_websphere_applicationsvr_v855_linux_standalone
+
+  was_os_user:
+    type: string
+    description: username for the Websphere operating system user
+    default: wasadmin
+
+  was_os_group:
+    type: string
+    description: group for the Websphere operating system user
+    default: wasgrp
+    
+  was_os_user_password:
+    type: string
+    description: password for the Websphere operating system user
+    default: P@ssw0rd
+  
+  was_os_user_home_dir:
+    type: string
+    description: home directory for the Websphere operating system user
+    default: /home/wasadmin
+  
+  was_install_dir:
+    type: string
+    description: Install directory of websphere
+    default: /opt/IBM/WebSphere/AppServer
+
+  was_profile_dir:
+    type: string
+    description: Profile directory of websphere node
+    default: /opt/IBM/WebSphere/AppServer/profiles
+
+  im_install_dir:
+    type: string
+    description: Install directory of InstallationManager
+    default: /opt/IBM/InstallationManager
+
+  expand_area:
+    type: string
+    description: Expand area for extracting the package
+    default: /tmp/cbps/expand_area
+  
+  customer_log_dir_enabled:
+    type: string
+    description: Select enable customer log directory
+    default: true
+  
+  customer_log_dir:
+    type: string
+    description: Log directory of customer
+    default: /opt/customer/logs
+    
+  java7_enabled:
+    type: string
+    description: Select enable java7 or not
+    default: true
+
+  was_fixpack:
+    type: string
+    description: Was fixpack version, 2digits only
+    default: '08'
+
+  java_fixpack:
+    type: string
+    description: java fixpack version
+    default: '7.1.3.10_0001'
+
+  sdk_32bit:
+    type: string
+    description: sdk feature, can select 32 bit or 64 bit
+    default: false
+
+  sdk_64bit:
+    type: string
+    description: sdk feature, can select 32 bit or 64 bit
+    default: true
+    
+  profile_name:
+    type: string
+    description: Standalone profile name
+    default: standalone01
+  
+  cell_name:
+    type: string
+    description: Standalone cell name
+    default: cell01
+
+  node_name:
+    type: string
+    description: Node name
+    default: standaloneNode01
+
+  server_name:
+    type: string
+    description: Server name
+    default: server01
+    
+  was_admin_username:
+    type: string
+    description: Admin user login was
+    default: wasadmin
+  
+  was_admin_password:
+    type: string
+    description: Admin password login was
+    default: Zaq12wsX
+        
+resources:
+
+  setup_yum_repo:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1027406
+        bootcmd:
+          - 'grep "yum_add_repo" /etc/cloud/cloud.cfg || sed -i "s/cloud_config_modules:/&\n - yum_add_repo/" /etc/cloud/cloud.cfg'
+        yum_repos:
+          rdsCustomerMainRepo:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/os/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo
+          rdsCustomerMainRepo_updates:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/updates/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo_updates
+          rdsCustomerMainRepo_supplementary:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/supplementary/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo_supplementary
+          rdsCustomerMainRepo_optional:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/optional/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo_supplementary
+          rdsCustomerMainRepo_lb:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/lb/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo_lb  
+ 
+  bootstrap_salt:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            if [ -f /etc/redhat-release ]; then
+              rpm -Uvh "http://9.9.151.238:8888/salt/saltstack-latest-el6.x86_64.rpm"
+              chkconfig salt-minion on
+            elif [ -f /etc/lsb-release ]; then
+              curl "http://9.9.151.238:8888/salt/saltstack-latest-trusty.x86_64.deb" -O
+              dpkg -i saltstack-latest-trusty.x86_64.deb
+              update-rc.d salt-minion start 80 2 3 4 5 . 
+            fi
+            mkdir -p /etc/salt/pki/minion
+            echo "master: " > /etc/salt/minion
+            echo "  - 10.2.1.46" >> /etc/salt/minion
+            echo "id: $STACK_ID-`hostname -s`" >> /etc/salt/minion
+            echo "mine_functions: " >> /etc/salt/minion
+            echo "  network.interfaces: []" >> /etc/salt/minion
+            echo "  grains.items: []" >> /etc/salt/minion
+            echo "mine_interval: 1" >> /etc/salt/minion
+            service salt-minion stop
+            service salt-minion start
+            sleep 30
+            /opt/saltstack/embedded/bin/salt-wrapper.py register $USER $PASS
+          params:
+            $USER: { get_param: salt_api_user}
+            $PASS: { get_param: salt_api_pass}
+            $STACK_ID: { get_param: "OS::stack_id" }
+  
+  update_etc_hosts:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            sed -i '/$server_hostname/d' /etc/hosts
+            echo "$server_ip $server_hostname.ibmpmc.com $server_hostname" >> /etc/hosts
+          params:
+            $server_hostname: { get_param: minion_one_name }
+            $server_ip: { get_attr: [server_pgPrivate-10-2-1-0-m24_port_one,fixed_ips, 0, ip_address] }
+            
+  assign_roles:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            echo "environment:" > /etc/salt/grains
+            echo "  $ENV" >> /etc/salt/grains
+            echo "pattern:" >> /etc/salt/grains
+            echo "  $WORKLOAD_AUTOMATION" >> /etc/salt/grains
+            echo "roles:">> /etc/salt/grains
+            echo "  - $ROLES_1" >> /etc/salt/grains
+            echo "  - $ROLES_2" >> /etc/salt/grains
+            echo "stack:" >> /etc/salt/grains
+            echo "  $STACK_ID" >> /etc/salt/grains
+            sleep 30
+            service salt-minion stop
+            service salt-minion start
+          params:
+            $ENV: { get_param: environment }
+            $WORKLOAD_AUTOMATION: { get_param: workload_automation }
+            $ROLES_1: { get_param: minion_one_role }
+            $ROLES_2: { get_param: minion_two_role }
+            $STACK_ID: { get_param: "OS::stack_id" }
+
+  create_pillar_file:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            totalMemory=`free -m | grep Mem | awk '{print $2}'`
+            if [ $totalMemory -le 1024 ]; then
+                initialHeapSize=512
+                maximumHeapSize=1024
+            elif [ $totalMemory -gt 1024 -a $totalMemory -le 2048 ]; then
+                initialHeapSize=1024
+                maximumHeapSize=2048
+            elif [ $totalMemory -gt 2048 -a $totalMemory -le 4096 ]; then
+                initialHeapSize=2048
+                maximumHeapSize=4096
+            elif [ $totalMemory -gt 4096 ]; then
+                initialHeapSize=4096
+                maximumHeapSize=8192
+            fi
+            cat << EOF > /tmp/pillar.yaml
+            ibm:
+              sw_repo_root: http://9.9.151.238:8888
+              im1x:
+                install_dir: $im_install_dir
+                expandArea: '/rds/expandArea/im1x'
+                archive: 'agent.installer.linux.gtk.x86_64_1.7.3000.20140521_1925.zip'
+                hash: 'md5=8747b8bd2a6063d59e7fbeb7a865d720'
+              wasv855:
+                users:
+                  wasadmin:
+                    gid: $was_os_group
+                    home: $was_os_home_dir
+                    name: $was_os_user
+                    password: $was_os_password
+                paths:
+                  # Install directory of websphere
+                  install_dir: $was_install_dir
+                  # Profile directory of websphere node
+                  profile_dir: $was_profile_dir
+                  temp_dir: /tmp/cbps
+                  # Install directory of InstallationManager
+                  im_install_dir: $im_install_dir
+                  im_shared_dir: /opt/IBM/IMShared
+                  # Expand area for extracting the package
+                  expand_area: $expand_area
+                settings:
+                  java7:
+                    enabled: $java7_enabled
+                  was_fixpack: $was_fixpack
+                  java_fixpack: $java_fixpack
+                  customer_log_dir_enabled: $enabled_customer_log_dir
+                  features:
+                    com.ibm.sdk.6_32bit: $sdk_32bit
+                    com.ibm.sdk.6_64bit: $sdk_64bit
+                  security:
+                    admin_user: $was_admin_username
+                    admin_user_password: $was_admin_password
+                  # Jvm propertity
+                  wsadmin:
+                    set_jvm_properties:
+                      standalone_jvmproperty:
+                        profile_path: $was_profile_dir/$profile_name
+                        node_name: $node_name
+                        server_name: $server_name
+                        initialHeapSize: $initialHeapSize
+                        maximumHeapSize: $maximumHeapSize
+                    set_process_execution:
+                      profile_path: $was_profile_dir/$profile_name
+                      runAsUser: $was_os_user
+                      runAsGroup: $was_os_group
+                    set_log_dir:
+                      standalone_log_dir:
+                        scope: server
+                        log_dir: $customer_log_dir
+                        profile_path: $was_profile_dir/$profile_name
+                        cell_name: $cell_name
+                        node_name: $node_name
+                        server_name: $server_name
+                  standalone_profile:
+                    profile_name: $profile_name
+                    cell: $cell_name
+                    nodename: $node_name
+                    servername: $server_name
+
+            EOF
+          params:
+            $flavor: {get_param: flavor }
+            $profile_name: {get_param: profile_name}
+            $cell_name: {get_param: cell_name}
+            $node_name: {get_param: node_name}
+            $server_name: {get_param: server_name}
+            $was_os_user: {get_param: was_os_user}
+            $was_os_group: {get_param: was_os_group}
+            $was_os_password: {get_param: was_os_user_password}
+            $was_os_home_dir: {get_param: was_os_user_home_dir}
+            $was_install_dir: {get_param: was_install_dir}
+            $im_install_dir: {get_param: im_install_dir}
+            $was_profile_dir: {get_param: was_profile_dir}
+            $expand_area: {get_param: expand_area}
+            $java7_enabled: {get_param: java7_enabled}
+            $was_fixpack: {get_param: was_fixpack}
+            $java_fixpack: {get_param: java_fixpack}
+            $sdk_32bit: {get_param: sdk_32bit}
+            $sdk_64bit: {get_param: sdk_64bit}
+            $was_admin_username: {get_param: was_admin_username}
+            $was_admin_password: {get_param: was_admin_password}
+            $customer_log_dir: {get_param: customer_log_dir}
+            $enabled_customer_log_dir: {get_param: customer_log_dir_enabled}
+
+            
+  run_orchestration:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            /opt/saltstack/embedded/bin/salt-wrapper.py orchestrate_heat $SALT_API_USER $SALT_API_PASS \
+              --environment $ENV \
+              --automation $WORKLOAD_AUTOMATION \
+              --orchestration $ORCHESTRATION \
+              --wait_url '$WAIT_URL' \
+              --stack_id $STACK_ID \
+              --pillar_file /tmp/pillar.yaml \
+              --pillar stack_id=$STACK_ID
+          params:
+            $SALT_API_USER: { get_param: salt_api_user}
+            $SALT_API_PASS: { get_param: salt_api_pass}
+            $ENV:           { get_param: environment }
+            $WORKLOAD_AUTOMATION:       { get_param: workload_automation }
+            $ORCHESTRATION: { get_param: salt_orchestration }
+            $STACK_ID:      { get_param: "OS::stack_id" }
+            $WAIT_URL:      { get_resource: wait_handle }
+
+  wait_condition:
+    type: "AWS::CloudFormation::WaitCondition"
+    depends_on: server_one
+    properties:
+      Handle: { get_resource: wait_handle }
+      Timeout: 3600
+
+  wait_handle:
+    type: "AWS::CloudFormation::WaitConditionHandle"
+
+  server_one_init:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+      - config: {get_resource: setup_yum_repo}
+      - config: {get_resource: update_etc_hosts}
+      - config: {get_resource: bootstrap_salt}
+      - config: {get_resource: assign_roles}
+      - config: {get_resource: create_pillar_file}
+      - config: {get_resource: run_orchestration}
+      
+  server_one:
+    type: OS::Nova::Server
+    properties:
+      networks:
+          - port: { get_resource: server_pgPrivate-10-2-1-0-m24_port_one }
+      name: { get_param: minion_one_name }
+      image: {get_param: image_id }
+      flavor: { get_param: flavor }
+      key_name: { get_param: Key_name }
+      config_drive: "True"
+      user_data_format: RAW
+      user_data: {get_resource: server_one_init}
+
+
+  server_pgPrivate-10-2-1-0-m24_port_one:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_server }
