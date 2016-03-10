@@ -1,0 +1,644 @@
+heat_template_version: 2013-05-23
+
+description: >
+  A template to install and configure Single SaltMaster stack with RHEL 6.x
+
+parameters:
+
+  salt_authentication_user:
+      type: string
+      description: The user for connecting to Salt API
+      default: saltauth
+  salt_authentication_pass:
+      type: string
+      description: Password for connecting to Salt API
+      hidden: True
+      default: pM0dularc
+  git_repo_user:
+    type: string
+    description: The filesystem owner of the git repositories
+    default: git
+  git_refresh_user:
+    type: string
+    description: The user that is used to refresh salt git repos on commit
+    default: gitrefresh
+  git_refresh_pass:
+    type: string
+    description: Password for git refresh user
+    hidden: True
+    default: pM0dularc
+    
+  flask_user:
+    type: string
+    description: The filesystem owner of the git repositories
+    default: flask
+    
+  yum_repo_url:
+    type: string
+    description: The server hosting the YUM repository
+    default: "http://9.9.151.238:8888"
+    
+  ssl_subject:
+    type: string
+    description: SSL Certificate subject
+    default: "/C=US/ST=Denial/L=Springfield/O=Dis/CN="
+
+  flavor:
+    type: string
+    description: SCOFLAVOR Flavor to be used for compute instance
+    default: "m1.small"
+
+  network_id_server:
+    type: string
+    description: SCONETWORK  Select the network to provision the system onto.
+    default: 050aedc2-dc2b-4da9-b074-b1b616147f05
+  
+  image:
+    type: string
+    description: OS Image to deploy onto
+    default: f700ef81-e0c3-4d97-a2d9-336ac0b12d25  # rhel6.5_ico_23Sep2015 
+
+  server_one_name:
+    type: string
+    description: The hostname of the salt master
+    default: "salt-master-MGS"
+    
+  repo_server:
+    type: string
+    description: The hostname of the server holding the saltstack rpm and reactors
+    default: "http://9.9.151.238:8888"
+
+
+    
+resources:
+  bootstrap_salt:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            rpm -Uvh "$REPO_SERVER/salt/saltstack-2016.3.0rc1-el6.x86_64.rpm"
+            
+            mkdir -p /etc/ssl/private
+            openssl genrsa -out /etc/ssl/private/key.pem 4096
+            openssl req -new -x509 -key /etc/ssl/private/key.pem -out /etc/ssl/private/cert.pem -days 1461 -subj "$SUBJ$(hostname)"
+            
+            groupadd -g 10000 $SALT_AUTH_USER
+            useradd -g 10000 -u 10000 $SALT_AUTH_USER 
+            echo "$SALT_AUTH_USER:$SALT_AUTH_PASS" | chpasswd
+            groupadd -g 10001 $GIT_REPO_USER
+            useradd -g 10001 -u 10001 $GIT_REPO_USER
+            groupadd -g 10002 $FLASK_USER
+            useradd -g 10002 -u 10002 $FLASK_USER
+            groupadd -g 10003 $GIT_REFRESH_USER
+            useradd -g 10003 -u 10003 $GIT_REFRESH_USER
+            echo "$GIT_REFRESH_USER:$GIT_REFRESH_PASS" | chpasswd            
+            
+            yum install -y httpd haproxy git mod_wsgi screen
+                        
+            curl $REPO_SERVER/salt/saltrunners-latest.tar.gz | tar -xvzf - -C /
+            sed -i 's/^Listen 80/#Listen 80/' /etc/httpd/conf/httpd.conf
+            
+            mkdir -p /install/softwareRepo
+            su - $FLASK_USER -c 'mkdir /home/$FLASK_USER/.ssh'
+            su - $FLASK_USER -c 'chmod 0700 /home/$FLASK_USER/.ssh'
+
+            ssh-keygen -f /root/.ssh/id_rsa -t rsa -N ''
+            su - $FLASK_USER -c "ssh-keygen -f /home/$FLASK_USER/.ssh/id_rsa -t rsa -N ''"
+            
+            
+            cat << EOF > /root/.ssh/config
+            StrictHostKeyChecking no
+            EOF
+            cat << EOF > /home/$FLASK_USER/.ssh/config
+            StrictHostKeyChecking no
+            EOF
+
+
+          params:
+            $SALT_AUTH_USER: { get_param: salt_authentication_user }
+            $SALT_AUTH_PASS: { get_param: salt_authentication_pass }
+            $GIT_REPO_USER: { get_param: git_repo_user }
+            $FLASK_USER: { get_param: flask_user }
+            $REPO_SERVER: { get_param: repo_server }
+            $GIT_REFRESH_USER: { get_param: git_refresh_user }
+            $GIT_REFRESH_PASS: { get_param: git_refresh_pass }
+            $SUBJ: { get_param: ssl_subject }
+            
+  setup_yum_repo:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1027406
+        bootcmd:
+          - 'grep "yum_add_repo" /etc/cloud/cloud.cfg || sed -i "s/cloud_config_modules:/&\n - yum_add_repo/" /etc/cloud/cloud.cfg'
+        yum_repos:
+          rdsCustomerMainRepo:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/os/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo
+          rdsCustomerMainRepo_updates:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/updates/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo_updates
+          rdsCustomerMainRepo_supplementary:
+            baseurl:
+              str_replace:
+                params:
+                  $YUM_REPO_URL: { get_param: yum_repo_url }  # Repository server url
+                template: '$YUM_REPO_URL/redhat/yum/6/server/supplementary/x86_64/'
+            enabled: true
+            gpgcheck: true
+            gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL
+            sslverify: false
+            name: rdsCustomerMainRepo_supplementary
+            
+  config_files:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            
+            #apache configuration files
+            cat << EOF > /etc/httpd/conf.d/rdsAssets.conf
+            
+            Listen 8888
+            <VirtualHost *:8888>
+              ServerAdmin admin@privatemodular.cloud
+              EnableMMAP Off
+              EnableSendfile On
+              DocumentRoot /install/softwareRepo
+              <Directory />
+                Options FollowSymLinks
+                AllowOverride None
+              </Directory>
+              <Directory /install/softwareRepo >
+                Options Indexes FollowSymLinks MultiViews
+                AllowOverride None
+                Order allow,deny
+                allow from all
+              </Directory>
+              ErrorLog /var/log/httpd/error_rds.log
+              LogLevel debug
+              CustomLog /var/log/httpd/access_rds.log combined
+              ServerSignature On
+            </VirtualHost>
+            EOF
+            
+            cat << EOF > /etc/httpd/conf.d/flaskApplication.conf
+            <VirtualHost *:4507>
+                ServerName localhost
+
+                WSGIDaemonProcess flask_application user=$FLASK_USER group=$FLASK_USER threads=5
+                WSGIScriptAlias / /srv/salt/flask/flask_application.wsgi
+
+                <Directory /srv/salt/flask>
+                  WSGIProcessGroup flask_application
+                  Require all granted
+                </Directory>
+                ErrorLog /var/log/httpd/error_flask.log
+                LogLevel debug
+                CustomLog /var/log/httpd/access_flask.log combined
+            </VirtualHost>
+            EOF
+            
+            #salt configuration files
+            mkdir -p /etc/salt/master.d
+
+            cat << EOF > /etc/salt/master
+            default_include: master.d/*.conf
+            EOF
+            
+
+            cat << EOF > /etc/salt/master.d/external_auth.conf
+            external_auth:
+              pam:
+                $SALT_AUTH_USER:
+                  - '@wheel'
+                  - '@runner'
+                  - '@jobs'
+                $GIT_REFRESH_USER:
+                  - '@runner'
+            EOF
+            
+
+            cat << EOF > /etc/salt/master.d/runners.conf
+            runner_dirs:
+              - /srv/salt/_runners
+            EOF
+            
+            cat << EOF > /etc/salt/master.d/reactors.conf
+            reactor:
+              - 'salt/netapi/hook/base':
+                - /srv/salt/reactor/init.sls
+              - 'salt/netapi/hook/cmd/run':
+                - /srv/salt/reactor/cmd/run.sls
+              - 'salt/netapi/hook/cmd/script':
+                - /srv/salt/reactor/cmd/script.sls
+              - 'salt/netapi/hook/cmd/run_state':
+                - /srv/salt/reactor/cmd/run_state.sls
+              - 'salt/netapi/hook/cmd/run_orch':
+                - /srv/salt/reactor/cmd/run_orch.sls
+              - 'salt/netapi/hook/cmd/run_vra':
+                - /srv/salt/reactor/cmd/run_vra.sls
+              - 'salt/netapi/hook/cmd/run_heat':
+                - /srv/salt/reactor/cmd/run_heat.sls
+              - 'salt/netapi/hook/minions/key/base':
+                - /srv/salt/reactor/minions/key/init.sls
+              - 'salt/netapi/hook/minions/key/accept':
+                - /srv/salt/reactor/minions/key/accept.sls
+              - 'salt/netapi/hook/minions/key/delete':
+                - /srv/salt/reactor/minions/key/delete.sls
+              - 'salt/netapi/hook/minions/sync/base':
+                - /srv/salt/reactor/minions/sync/init.sls
+              - 'salt/netapi/hook/minions/sync/all':
+                - /srv/salt/reactor/minions/sync/all.sls
+              - 'salt/netapi/hook/minions/sync/modules':
+                - /srv/salt/reactor/minions/sync/modules.sls
+              - 'salt/netapi/hook/services/base':
+                - /srv/salt/reactor/services/init.sls
+              - 'salt/netapi/hook/services/reload':
+                - /srv/salt/reactor/services/reload.sls
+              - 'salt/netapi/hook/services/restart':
+                - /srv/salt/reactor/services/restart.sls
+              - 'salt/netapi/hook/services/start':
+                - /srv/salt/reactor/services/start.sls
+              - 'salt/netapi/hook/services/stop':
+                - /srv/salt/reactor/services/stop.sls
+              - 'salt/netapi/hook/states/highstate':
+                - /srv/salt/reactor/states/highstate.sls
+              - 'rds/custom/*':
+                - salt://rds_custom_reactor.sls
+              - 'salt/netapi/hook/fileserver/gitfs/update':
+                - /srv/salt/reactor/update_fileserver.sls
+              - 'salt/netapi/hook/refresh_pillar':
+                - /srv/salt/reactor/refresh_pillar.sls
+              - 'minion_start':
+                - /srv/salt/reactor/minion_start.sls
+            EOF
+
+            cat << EOF > /etc/salt/master.d/logging.conf
+            log_file: /var/log/salt/master
+            log_level: debug
+            EOF
+
+            cat << EOF > /etc/salt/master.d/git_pillar_root.conf
+            ext_pillar:
+              - git:
+                - master git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/prod-pillar.git:
+                  - env: prod
+                - master git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/test-pillar.git:
+                  - env: test
+                - master git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/dev-pillar.git:
+                  - env: dev
+            EOF
+
+            cat << EOF > /etc/salt/master.d/salt_api.conf
+            rest_cherrypy:
+              port: 8000
+              host: 0.0.0.0
+              ssl_crt: /etc/ssl/private/cert.pem
+              ssl_key: /etc/ssl/private/key.pem
+              debug: True
+              webhook_disable_auth: False
+              webhook_url: /hook
+            EOF
+
+            cat << EOF > /etc/salt/master.d/modules.conf
+            module_dirs:
+              - /srv/salt/modules
+            EOF
+
+            cat << EOF > /etc/salt/master.d/failhard.conf
+            failhard: False
+            EOF
+
+            cat << EOF > /etc/salt/master.d/fileserver_backend.conf
+            file_buffer_size: 1048576
+            fileserver_backend:
+              - git
+            EOF
+
+            cat << EOF > /etc/salt/master.d/git_file_roots.conf
+            gitfs_remotes:
+              - git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/salt.git
+              - git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/formulae.git
+              - git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/modules.git
+              - git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/patterns.git
+
+            gitfs_env_whitelist:
+              - dev
+              - test
+              - prod
+            EOF
+
+            cat << EOF > /etc/haproxy/haproxy.cfg
+            
+            #---------------------------------------------------------------------
+            # Example configuration for a possible web application.  See the
+            # full configuration options online.
+            #
+            #   http://haproxy.1wt.eu/download/1.4/doc/configuration.txt
+            #
+            #---------------------------------------------------------------------
+            
+            #---------------------------------------------------------------------
+            # Global settings
+            #---------------------------------------------------------------------
+            global
+                # to have these messages end up in /var/log/haproxy.log you will
+                # need to:
+                #
+                # 1) configure syslog to accept network log events.  This is done
+                #    by adding the '-r' option to the SYSLOGD_OPTIONS in
+                #    /etc/sysconfig/syslog
+                #
+                # 2) configure local2 events to go to the /var/log/haproxy.log
+                #   file. A line like the following can be added to
+                #   /etc/sysconfig/syslog
+                #
+                #    local2.*                       /var/log/haproxy.log
+                #
+                log         127.0.0.1 local2
+            
+                chroot      /var/lib/haproxy
+                pidfile     /var/run/haproxy.pid
+                maxconn     4000
+                user        haproxy
+                group       haproxy
+                daemon
+            
+                # turn on stats unix socket
+                stats socket /var/lib/haproxy/stats
+            
+            #---------------------------------------------------------------------
+            # common defaults that all the 'listen' and 'backend' sections will
+            # use if not designated in their block
+            #---------------------------------------------------------------------
+            
+            defaults
+                mode                    http
+                log                     global
+                option                  httplog
+                option                  dontlognull
+                option http-server-close
+                option forwardfor       except 127.0.0.0/8
+                option                  redispatch
+                retries                 3
+                timeout http-request    10s
+                timeout queue           1m
+                timeout connect         10s
+                timeout client          1m
+                timeout server          1m
+                timeout http-keep-alive 10s
+                timeout check           10s
+                maxconn                 3000
+            
+            #---------------------------------------------------------------------
+            # main frontend which proxys to the backends
+            #---------------------------------------------------------------------
+            frontend  main *:80
+            
+                default_backend             assets
+            
+            #---------------------------------------------------------------------
+            # round robin balancing between the various backends
+            #---------------------------------------------------------------------
+            backend assets
+                balance     roundrobin
+                server  $server_name $server_name:8888 check
+            EOF
+            
+            mkdir -p /srv/salt/flask
+            
+            cat << EOF > /srv/salt/flask/flask_application.wsgi
+            import sys,os
+            sys.stdout = sys.stderr
+            sys.path.insert(0, '/srv/salt/flask')
+            os.chdir("/srv/salt/flask")
+            from flask_application import app as application
+            EOF
+
+            cat > /srv/salt/flask/flask_application.py << EOF
+            #!/opt/saltstack/embedded/bin/python
+            from flask import Flask, jsonify, request
+            import git, os, shutil, yaml
+            app = Flask(__name__)
+
+            @app.route('/create_pillar_data/', methods=['POST'])
+            def create_pillar_data():
+                content = request.get_json(force=True)
+            #    assertExistence(content, ['stackid', 'pillardata_dict', 'env_var'])
+
+                stack_id = content['stackid']
+            #    assertNotEmptyString('stackid', stack_id)
+
+                pillar_data_dict = content['pillardata_dict']
+            #    assertNotEmptyString('pillardata_dict', pillar_data_dict)
+
+                env = content['env_var']
+            #    assertNotEmptyString('env', env_var)
+                pattern = content['pattern']
+
+                DIR_NAME = "pillar_project"
+                if env=='dev':
+                      REMOTE_URL = "git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/dev-pillar.git"
+                if env=='test':
+                      REMOTE_URL = "git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/test-pillar.git"
+                if env=='prod':
+                      REMOTE_URL = "git+ssh://$GIT_REPO_USER@$server_name/home/$GIT_REPO_USER/prod-pillar.git"
+
+                if os.path.isdir('/srv/salt/flask/Pillar_Project'):
+                  print 'Removing Pillar_Project'
+                  shutil.rmtree('/srv/salt/flask/Pillar_Project')
+
+                os.chdir('/srv/salt/flask')
+                os.mkdir('Pillar_Project')
+                print 'Created a folder Piller_Project'
+                os.chdir('Pillar_Project')
+                repo=git.Repo.clone_from(REMOTE_URL,'/srv/salt/flask/Pillar_Project')
+                print 'Cloned Pillar project'
+                if not os.path.exists('/srv/salt/flask/Pillar_Project/' + pattern):
+                  os.makedirs('/srv/salt/flask/Pillar_Project/' + pattern)
+                fo = open(pattern + '/' + stack_id + '.sls', "w")
+                stream=yaml.safe_dump(pillar_data_dict, default_flow_style=False,allow_unicode=True)
+                fo.write(stream)
+                fo.close()
+                print 'New file stack_id.sls is created and data dictionary is written into it in yaml format'
+                repo.git.add(pattern + '/' + stack_id + '.sls')
+                print 'Git added stack_id.sls file'
+
+                fo = open("top.sls", "r+")
+                if not fo.read().find(stack_id):
+                  data=yaml.load(
+                  'stackid:'+stack_id+'  - match: grain - ' + pattern + '/' + stack_id)
+                  stream=yaml.dump(data, default_flow_style=False)
+                  fo.write(stream.replace('- ','\n  - '))
+                fo.close()
+                print 'Opened existing top.sls file and appended the stacked id information in yaml format'
+                repo.git.add('top.sls')
+                print 'Git added top.sls'
+                if repo.is_dirty():
+                  repo.git.commit(m='added stackid.sls and updated top.sls')
+                  print 'Git committed the changes'
+                repo.git.push()
+                print'completed Git push'
+                return jsonify(result=True)
+                os.chdir('/srv/salt/flask')
+
+            if __name__ == '__main__':
+                app.debug = True
+                app.run(host='0.0.0.0')
+            EOF
+
+            chown -R $FLASK_USER:$FLASK_USER /srv/salt/flask
+            chmod +x /srv/salt/flask/flask_application.py
+                
+          params:
+            $server_name: { get_param: server_one_name }
+            $FLASK_USER: { get_param: flask_user }
+            $SALT_AUTH_USER: { get_param: salt_authentication_user }
+            $GIT_REPO_USER: { get_param: git_repo_user }
+            $GIT_REFRESH_USER: { get_param: git_refresh_user }
+            
+            
+  configure_git:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/salt.git'
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/formulae.git'
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/modules.git'
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/patterns.git'
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/prod-pillar.git'
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/dev-pillar.git'
+            su - $GIT_REPO_USER -c 'git init --bare /home/$GIT_REPO_USER/test-pillar.git'
+            su - $GIT_REPO_USER -c 'mkdir /home/$GIT_REPO_USER/.ssh'
+            su - $GIT_REPO_USER -c 'chmod 0700 /home/$GIT_REPO_USER/.ssh'
+            cat /root/.ssh/id_rsa.pub >> /home/$GIT_REPO_USER/.ssh/authorized_keys
+            cat /home/$FLASK_USER/.ssh/id_rsa.pub >> /home/$GIT_REPO_USER/.ssh/authorized_keys
+            chown $GIT_REPO_USER:$GIT_REPO_USER /home/$GIT_REPO_USER/.ssh/authorized_keys
+            chmod 0600 /home/$GIT_REPO_USER/.ssh/authorized_keys
+            
+            for repo in salt formulae modules patterns prod-pillar dev-pillar test-pillar; do
+            cat << EOF > /home/$GIT_REPO_USER/$repo.git/hooks/post-update
+            #!/bin/bash
+            SALTAPI="localhost:8000"
+            USERNAME="$GIT_REFRESH_USER"
+            PASSWORD="$GIT_REFRESH_PASS"
+            curl -sSk https://$SALTAPI/login -c ~/cookies.txt -H 'Accept: application/x-yaml' -d username=$USERNAME -d password=$PASSWORD -d eauth=pam
+            curl -sSk https://$SALTAPI/hook/fileserver/gitfs/update -b ~/cookies.txt -H 'Accept: application/x-yaml' -d eauth=pam
+            rm -f ~/cookies.txt
+            EOF
+            chown $GIT_REPO_USER:$GIT_REPO_USER /home/$GIT_REPO_USER/$repo.git/hooks/post-update
+            chmod 0775 /home/$GIT_REPO_USER/$repo.git/hooks/post-update
+            done
+            
+            su - $FLASK_USER -c 'mkdir -p /tmp/init'
+
+            su - $FLASK_USER -c 'cd /tmp/init;git clone git@$server_name:/home/git/test-pillar.git'
+            su - $FLASK_USER -c 'cd /tmp/init/test-pillar;git commit --allow-empty -m "initial commit"'
+            su - $FLASK_USER -c 'cd /tmp/init/test-pillar;git config --global user.name "local GIT Acct"'
+            su - $FLASK_USER -c 'cd /tmp/init/test-pillar;git config --global user.email git@cbps.com'
+            su - $FLASK_USER -c 'cd /tmp/init/test-pillar;git commit --allow-empty -m "initial commit"'
+            su - $FLASK_USER -c 'cd /tmp/init/test-pillar;git push'
+            su - $FLASK_USER -c 'cd /tmp/init/test-pillar;git push origin master'
+            
+            su - $FLASK_USER -c 'cd /tmp/init;git clone git@$server_name:/home/git/dev-pillar.git'
+            su - $FLASK_USER -c 'cd /tmp/init/dev-pillar;git commit --allow-empty -m "initial commit"'
+            su - $FLASK_USER -c 'cd /tmp/init/dev-pillar;git config --global user.name "local GIT Acct"'
+            su - $FLASK_USER -c 'cd /tmp/init/dev-pillar;git config --global user.email git@cbps.com'
+            su - $FLASK_USER -c 'cd /tmp/init/dev-pillar;git commit --allow-empty -m "initial commit"'
+            su - $FLASK_USER -c 'cd /tmp/init/dev-pillar;git push'
+            su - $FLASK_USER -c 'cd /tmp/init/dev-pillar;git push origin master'
+            
+            su - $FLASK_USER -c 'cd /tmp/init;git clone git@$server_name:/home/git/prod-pillar.git'
+            su - $FLASK_USER -c 'cd /tmp/init/prod-pillar;git commit --allow-empty -m "initial commit"'
+            su - $FLASK_USER -c 'cd /tmp/init/prod-pillar;git config --global user.name "local GIT Acct"'
+            su - $FLASK_USER -c 'cd /tmp/init/prod-pillar;git config --global user.email git@cbps.com'
+            su - $FLASK_USER -c 'cd /tmp/init/prod-pillar;git commit --allow-empty -m "initial commit"'
+            su - $FLASK_USER -c 'cd /tmp/init/prod-pillar;git push'
+            su - $FLASK_USER -c 'cd /tmp/init/prod-pillar;git push origin master'
+          params:
+            $server_name: { get_param: server_one_name }
+            $FLASK_USER: { get_param: flask_user }
+            $GIT_REPO_USER: { get_param: git_repo_user }
+            $GIT_REFRESH_USER: { get_param: git_refresh_user }
+            $GIT_REFRESH_PASS: { get_param: git_refresh_pass }
+
+  start_services:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/bin/bash
+            chkconfig salt-master on
+            chkconfig salt-api on
+            chkconfig httpd on
+            chkconfig haproxy on
+            service httpd start
+            service haproxy start
+            service salt-master start
+            service salt-api start
+          params:
+            xx: xxx
+
+
+  wait_condition:
+    type: "AWS::CloudFormation::WaitCondition"
+    depends_on: server_one
+    properties:
+      Handle: { get_resource: wait_handle }
+      Timeout: 1800
+
+  wait_handle:
+    type: "AWS::CloudFormation::WaitConditionHandle"
+
+  server_one_init:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+      - config: {get_resource: setup_yum_repo}
+      - config: {get_resource: bootstrap_salt}
+      - config: {get_resource: config_files}
+      - config: {get_resource: configure_git}
+      - config: {get_resource: start_services}
+
+  server_one:
+    type: OS::Nova::Server
+    properties:
+      networks:
+          - port: { get_resource: server_pgPrivate-10-2-1-0-m24_port_one  }
+      name: { get_param: server_one_name }
+      image: {get_param: image } 
+      flavor: { get_param: flavor }
+      config_drive: "True"
+      user_data_format: RAW
+      user_data:
+        get_resource: server_one_init
+
+  server_pgPrivate-10-2-1-0-m24_port_one:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network_id_server }
