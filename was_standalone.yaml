@@ -32,9 +32,10 @@ parameters:
     description: OS Image to deploy onto
     default: c85c07f4-60ad-439b-a398-e87db65644de  # Ubuntu_14.04_LTS_Server4
   Key_name:
-    default: key_name
     type: string
     description: Key Name
+    constraints:
+     - custom_constraint: nova.keypair
   environment:
     type: string
     description: The environment the nodes are part of
