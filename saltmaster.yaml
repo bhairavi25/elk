@@ -78,7 +78,7 @@ resources:
         str_replace:
           template: |
             #!/usr/bin/env bash
-            rpm -Uvh "$REPO_SERVER/salt/saltstack-2016.3.0rc1-el6.x86_64.rpm"
+            rpm -Uvh "$REPO_SERVER/salt/saltstack-latest-el6.x86_64.rpm"
             
             mkdir -p /etc/ssl/private
             openssl genrsa -out /etc/ssl/private/key.pem 4096
