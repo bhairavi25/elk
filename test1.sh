@@ -1,3 +1,3 @@
 #!/bin/bash
 
-echo \"Hello world1\" >> /root/testfile.txt
+echo \"Hello world1\"$Server_name >> /root/testfile.txt
