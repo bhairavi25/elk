@@ -1,0 +1,14 @@
+#heat_template_version: 2013-05-23
+
+parameter_defaults:
+  network_id_External_Network: "16db34a6-b98b-46ad-a862-f9fb52838c03"
+  Server_name: "test-provision11"
+  image: "3497869d-239e-4756-91e1-5d3b11df3ed3"
+  flavor: "m1.medium"
+  key_name: "bhairavi"
+  salt_api_user: "saltauth"
+  salt_api_pass: "saltauth"
+  test_text1: "abcdefgh"
+
+resource_registry:
+  My::WP::Server: "https://raw.githubusercontent.com/bhairavi25/elk/master/using_file1.yaml"
