@@ -28,9 +28,9 @@ parameters:
     type: string
     description: 'For most clouds, the name of the key-pair to be used for the compute instance; for VMware clouds, the contents of the public SSH key for the compute instance'
     label: SSH Key name
-    #default: Bhairavi
-    constraints:
-     - custom_constraint: nova.keypair
+    default: Bhairavi
+    #constraints:
+     #- custom_constraint: nova.keypair
 
   salt_api_user:
       type: string
