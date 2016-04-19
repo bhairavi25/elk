@@ -66,3 +66,32 @@ resources:
     type: OS::Neutron::Port
     properties:
       network_id: { get_param: network_id_External_Network }
+  
+  was_standalone1:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config:
+        str_replace:
+          template: { get_file: "https://raw.githubusercontent.com/bhairavi25/elk/master/test1.sh" }
+          params:
+            $SALT_API_USER: { get_param: salt_api_user}
+            $SALT_API_PASS: { get_param: salt_api_pass}
+            $test_text1: { get_param: test_text1 }
+
+  was_standalone2:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config: { get_file: "https://raw.githubusercontent.com/bhairavi25/elk/master/test2.sh" }
+
+  was_standalone3:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config: { get_file: "https://raw.githubusercontent.com/bhairavi25/elk/master/test3.sh" }
+
+  was_standalone_init:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+       - config: { get_resource: was_standalone1 }
+       - config: { get_resource: was_standalone2 }
+       - config: { get_resource: was_standalone3 }
