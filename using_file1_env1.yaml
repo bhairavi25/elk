@@ -1,0 +1,91 @@
+#heat_template_version: 2015-04-30
+heat_template_version: 2013-05-23
+
+description: >
+  A demo template to show provisioning of a single Linux instances.
+#This template worked with heat stack-create very well but not with /stacks , horizon etc
+parameters:
+  Server_name:
+    type: string
+    description: sample-heat-test
+    default: "test-provision9"
+
+  flavor:
+    type: string
+    description: medium flavor
+    default: "m1.medium"
+
+  image:
+    type: string
+    description: rhel
+    #default: "3497869d-239e-4756-91e1-5d3b11df3ed3"
+    default: "f700ef81-e0c3-4d97-a2d9-336ac0b12d25"
+
+  network_id_External_Network:
+    type: string
+    description: Network
+    default: "050aedc2-dc2b-4da9-b074-b1b616147f05"
+
+  key_name:
+    type: string
+    description: 'For most clouds, the name of the key-pair to be used for the compute instance; for VMware clouds, the contents of the public SSH key for the compute instance'
+    label: SSH Key name
+    default: Bhairavi
+    #constraints:
+     #- custom_constraint: nova.keypair
+
+  test_text1:
+    type: string
+    description: The server hosting the YUM repository
+    default: "file1_text"
+
+  salt_api_user:
+      type: string
+      description: The user connecting to Salt API
+      default: "file1text"
+
+  salt_api_pass:
+      type: string
+      description: Password for connecting to Salt API
+      hidden: True
+      default: "bhairavi25"
+  file1_nested--image:
+    type: string
+    description: 'rhel'
+    default: 'f700ef81-e0c3-4d97-a2d9-336ac0b12d25'
+  file1_nested--network_id_External_Network:
+    type: string
+    description: 'Network'
+    default: '050aedc2-dc2b-4da9-b074-b1b616147f05'
+  file1_nested--salt_api_pass:
+    type: string
+    description: 'Password for connecting to Salt API'
+    default: 'zzzzzzzz'
+    hidden: true
+  file1_nested--salt_api_user:
+    type: string
+    description: 'The user connecting to Salt API'
+    default: 'saltauth'
+  file1_nested--Server_name:
+    type: string
+    description: 'sample-heat-test'
+    default: 'test-provision9'
+  file1_nested--test_text1:
+    type: string
+    description: 'The server hosting the YUM repository'
+    default: 'abcd'
+
+
+resources:
+## LOCATION { "UC::Blueprint::file1_nested" : "/landscaper/rest/orchestration/blueprints/bhairavi.sankar_d3679fa2_1997_4744_805d_deffdf045ffa/default/file1_nested/file1_nested.yaml" }
+  file1_nested:
+    type: UC::Blueprint::file1_env_nested
+    properties:
+      flavor: { get_param: flavor }
+      image: { get_param: file1_nested--image }
+      key_name: { get_param: key_name }
+      network_id_External_Network: { get_param: file1_nested--network_id_External_Network }
+      salt_api_pass: { get_param: file1_nested--salt_api_pass }
+      salt_api_user: { get_param: file1_nested--salt_api_user }
+      Server_name: { get_param: file1_nested--Server_name }
+      test_text1: { get_param: file1_nested--test_text1 }
